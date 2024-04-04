@@ -1,25 +1,11 @@
-# this is the webapp hosted on the cloud
 from flask import Flask, jsonify, session, request, send_file
 from zipfile import ZipFile
 import os
+
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 UPLOAD_DIRECTORY = 'user_uploads'
 os.makedirs(UPLOAD_DIRECTORY, exist_ok=True)
-
-@app.route('/startSession', methods=['POST'])
-def start_session():
-    if 'session_started' in session:
-        return jsonify({'error': 'Session is already started.'})
-    
-    token_id = request.form.get('token_id')  # Using request.form to get data from POST request
-    if token_id is None:
-        return jsonify({'error': 'Token ID not provided.'})
-    
-    session['session_started'] = True
-    session['token_id'] = token_id
-    
-    return jsonify({'message': 'Session started successfully.', 'token_id': token_id})
 
 def delete_uploaded_files():
     # Delete all files from the user_uploads directory
@@ -31,22 +17,21 @@ def delete_uploaded_files():
         except Exception as e:
             print(f"Error deleting file {file_path}: {e}")
 
+@app.route('/startSession', methods=['POST'])
+def start_session():
+    # Start a session for the kiosk
+    session['session_started'] = True
+    return jsonify({'message': 'Session started successfully.'}), 200
+
 @app.route('/endSession', methods=['GET'])
 def end_session():
-    if 'session_started' in session:
-        session.clear()
-        delete_uploaded_files()  # Call the function to delete uploaded files
-        return jsonify({'message': 'Session ended successfully. Uploaded files deleted.'}), 200
-    else:
-        return jsonify({'error': 'No session to end.'}), 400
-    
+    # Clear the session data
+    session.clear()
+    delete_uploaded_files()  # Call the function to delete uploaded files
+    return jsonify({'message': 'Session ended successfully. Uploaded files deleted.', 'status_code': '200'})
 
-
-@app.route('/upload/<token_id>', methods=['POST'])
-def upload_files(token_id):
-    if 'session_started' not in session or session['token_id'] != token_id:
-        return jsonify({'error': 'Unauthorized access.'}), 401
-    
+@app.route('/upload', methods=['POST'])
+def upload_files():
     if 'files' not in request.files:
         return jsonify({'error': 'No files provided.'}), 400
     
@@ -56,11 +41,8 @@ def upload_files(token_id):
     
     return jsonify({'message': 'Files uploaded successfully.'}), 200
 
-@app.route('/download/<token_id>', methods=['GET'])
-def download_files(token_id):
-    if 'session_started' not in session or session['token_id'] != token_id:
-        return jsonify({'error': 'Unauthorized access.'}), 401
-
+@app.route('/download', methods=['GET'])
+def download_files():
     # Get a list of all files in the directory
     all_files = os.listdir(UPLOAD_DIRECTORY)
 
